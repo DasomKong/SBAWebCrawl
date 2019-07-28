@@ -1,143 +1,99 @@
-"""도스쉘에서 다음과 같이 입력하면 자동으로 패키지 다운, 설치가 됩니다.
-   시간이 소요되니 커서가 뜰 때까지 기다려 주세요.
-   pip install beautifulsoup4
-   pip install matplotlib
-"""
 #내장 모듈
 from urllib.request import *
 import sys
-import time
 
 #외부 모듈
 from bs4 import *
 import matplotlib.pyplot as p
 
-def extractLastPrice ( webUrl, DN ) :  
-    """인터넷에서 주어진 일 수만큼 최근의 일일 종가를 추출
-       입력: webUrl (인터넷 주소), DN (추출할 일 수)
-       출력: 일일 종가 리스트(가장 오래된 종가부터 최근까지 순서대로 저장)
-    """
-    pList = list()
+# 중간의 id 를 제외하고 공용이므로 전역으로 뺌.
+webUrl = "https://m.entertain.naver.com/tvBrand/%s/broadcastInfo/ratingCard"
+colors = ['r','g','b','c','m','y','k','w']
+
+def CheckRatings(tgDict):
+    RatingDict = dict()
+    # 예시로 하나만.. 만약 여러 개의 프로그램을 보여주려고 한다면, range의 값을 수정하면 됨.
+    # 추가할 id는 참고하는 홈페이지에서 골라서 밑의 'inputDrama' 함수에 넣어서 반환해주세요.
     
-    PN = DN // 20
-    # DN <= PN * 20 < DN + 20이도록
-    if DN > PN * 20:
-        PN+=1
-        
-    for page in range(PN):
-        wPage = urlopen(webUrl + str(page+1))
+    # 타깃리스트에 들어있는 id 값 갯수만큼 반복해서 dict에 대입
+    for drama_name, drama_id in tgDict.items():
+        # wPage 변수는 타깃리스트에 들어있는 id를 대입해서 완성한 url
+        wPage = urlopen(webUrl % drama_id)
+        # print(webUrl % page) # 확인하려면 앞의 주석을 지워서 확인
         soup = BeautifulSoup(wPage, 'html.parser')
-        trList = soup.find_all('tr', onmouseover="mouseOver(this)")
     
-        # 한페이지 종가 추출
-        for tr in trList:
-            tdList = tr.find_all('td')
-            pList.append(int(tdList[1].get_text().replace(',',''))) # 값만 나옴
-    
-    pList.reverse()
-    ##print (pList,"size=",len(pList))   # 결과 확인 용(확인 후 주석처리)
-    return pList
-
-def makeMA (pList, numMA) :  
-    """이동평균선 리스트를 만든다
-       입력: pList(주식 종가 리스트), numMA (평균 낼 종가 수)
-       출력: mList (이동평균값 리스트)
-    """
-    mList = list()
-    Q = list()
-    
-    p0 = pList[0]
-    mSum = p0 * numMA
-
-    for i in range(numMA):
-        Q.append(p0)
+        # 시청률 값은 tag가 'em' 이고 아래와 같이 find_all 하면 해당 페이지에서 찾을 수 있음.
+        emList = soup.find_all('em', {'class': 'rating_grp_percent_num'})
         
-    for M in pList:
-        mSum -= Q.pop(0)
-        mSum += M
-        mList.append(mSum/numMA)
-        Q.append(M)
-    #print (mList,"size=",len(mList))   # 결과 확인 용(확인 후 주석처리)
-    return mList
+        # 시청률값을 담기 위한 임시 리스트
+        tmpList = list()
+        for em in emList:
+            tmpList.append(float(em.get_text()))  # 값만 나옴
+        # 리스트를 뒤집어서 첫회차가 가장 앞으로 올 수 있게
+        tmpList.reverse()
+        RatingDict[drama_name] = tmpList
+            
+    return RatingDict
 
 
-def inputCompanyAndDays ():
-    """회사, 회사의 web 주소, 추출할 종가의 기간을 선택
-       입력: 없음
-       출력: companyName (회사이름), webUrl (web 주소 시작 페이지), days (추출할 일 수)
-    """
+def inputDrama():
+    print("방송 정보를 출력합니다.")
 
-    #회사 선택
-    print ('1:samsung, 2:lge, 3:hynix')  #관심있는 다른 회사로 시도해 보세요.
-    inputName = input ('회사를 고르세요 : ')   
-    if (inputName == '1'):
-        webUrl = 'http://finance.naver.com/item/frgn.nhn?code=005930&page='
-        companyName = 'samsung'
-    elif (inputName == '2'):
-        webUrl = 'http://finance.naver.com/item/frgn.nhn?code=066570&page='
-        companyName = 'lge'
-    elif (inputName == '3'):
-        webUrl = 'http://finance.naver.com/item/frgn.nhn?code=000660&page='
-        companyName = 'hynix'
-    else:
-        print("잘못된 입력입니다. 프로그램을 종료합니다.")
-        sys.exit()
-
-    #추출할 종가의 날 수를 입력받는다.
-    inputNumber = input ('종가 추출 기간을 입력하세요(20의 배수가 되도록 상향 조정합니다) : ')
-    if (inputNumber.isdigit() and int(inputNumber) > 0) :
-        days = int (inputNumber)
-    else:
-        print("잘못된 입력입니다. 프로그램을 종료합니다.")
-        sys.exit()
-
-    return companyName, webUrl, days
-
+    tmpTargetDict = dict()
     
-def drawGraph (pList):  
-    """주식 일일종가, 5일, 20일, 60일 이동평균선을 그린다.
-       입력: pList (주식 종가 리스트)
-       출력: 그래프
-    """
+    # 꽃보다 남자 id : 662425
+    tempid = '662425'
+    tempname = 'boys over flowers'
+    tmpTargetDict[tempname] = tempid
 
-    days = len(pList)
-    print("일수=", days)
+    # # 기간이 0일 경우 하루만 출력
+    # if (inputNumber.isdigit() and int(inputNumber) >= 0):
+    #     days = int(inputNumber)
+    # else:
+    #     print("잘못된 입력입니다. 프로그램을 종료합니다.")
+    #     sys.exit()
+
+    return tmpTargetDict
+
+
+def drawGraph(pDict):
+    days = -1
+    
+    # 가장 긴 회차 검색
+    for length in pDict.values():
+        tmplength = len(length)
+        if tmplength > days:
+            days = tmplength
+    
+    print("제일 긴 회차수=", days) # 확인 후 지워도 됨
+    
     #그래프의 x값 list 생성
-    xAxis = list(range(-days + 1, 1)) # 100개면 -99~0개까지 x축을 만든다.
+    xAxis = list(range(1, days + 1))  # 100개면 -99~0개까지 x축을 만든다.
 
-    #이동평균선 생성
-    MA5List  = makeMA (pList,  5)
-    MA20List = makeMA (pList, 20)
-    MA60List = makeMA (pList, 60)
+    # 구해온 자료들을 여기서 세팅과 출력
+    i = 0
+    for dramaname, dramalist in pDict.items():
+        #전역변수로 선언한 colors[] list
+        p.plot(xAxis, dramalist, colors[i], label=dramaname)
+        i += 1
 
-    #종가와 이동평균선 그리기
-    p.plot (xAxis, pList,    'r', label = stockName) #종가를 그린다.
-    p.plot (xAxis, MA5List,  'b', label = '5MA')     # 5일 이동평균선
-    p.plot (xAxis, MA20List, 'g', label = '20MA')    # 20일 이동평균선
-    p.plot (xAxis, MA60List, 'y', label = '60MA')    # 60일 이동평균선
-
-    #그래프의 레이블 및 비주얼 효과 생성
-    p.xlabel ('Day')
-    p.ylabel ('Last Price')
-    p.grid (True)
-    p.legend(loc = 'upper left')
+        #그래프의 레이블 및 비주얼 효과 생성
+    p.xlabel('turn')
+    p.ylabel('ratings')
+    
+    p.grid(True)
+    p.legend(loc='upper left')
     p.show()
 
     return
 
 
-"""***메인 프로그램: 주식 종가 추출 및 그리기***"""
+# main start
 
-stockName, stockAddr, days = inputCompanyAndDays() # 회사 선택
+TargetDict = inputDrama()  # 드라마 선택
 
-startTime = time.time()            # 현재 시각 기록
+ResultDict = CheckRatings(TargetDict)  # 시청률 추출
 
-pList = extractLastPrice(stockAddr, days) # 종가 추출
+drawGraph(ResultDict)  # 그리기
 
-exeTime = time.time() - startTime  # 경과 시간 체크
-print("\n추출 완료(소요 시간 = %.2f 초)" %exeTime)
-
-drawGraph(pList) # 그리기
-
-""" ***The End of Main*** """
-
+# end of main
