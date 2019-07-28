@@ -5,6 +5,7 @@ import sys
 #외부 모듈
 from bs4 import *
 import matplotlib.pyplot as p
+import matplotlib
 
 # 중간의 id 를 제외하고 공용이므로 전역으로 뺌.
 webUrl = "https://m.entertain.naver.com/tvBrand/%s/broadcastInfo/ratingCard"
@@ -19,6 +20,7 @@ def CheckRatings(tgDict):
     for drama_name, drama_id in tgDict.items():
         # wPage 변수는 타깃리스트에 들어있는 id를 대입해서 완성한 url
         wPage = urlopen(webUrl % drama_id)
+
         # print(webUrl % page) # 확인하려면 앞의 주석을 지워서 확인
         soup = BeautifulSoup(wPage, 'html.parser')
     
@@ -41,11 +43,11 @@ def inputDrama():
 
     tmpTargetDict = dict()
     
-    # 꽃보다 남자 id : 662425
-    tempid = '662425'
-    tempname = 'boys over flowers'
-    tmpTargetDict[tempname] = tempid
-
+    # 슈돌 id : 675566 #미션 id:5930336
+    
+    tmpTargetDict['Superman comeback']='675566'
+    tmpTargetDict['Mr.sunshine']='5930336'
+   
     # # 기간이 0일 경우 하루만 출력
     # if (inputNumber.isdigit() and int(inputNumber) >= 0):
     #     days = int(inputNumber)
@@ -53,36 +55,28 @@ def inputDrama():
     #     print("잘못된 입력입니다. 프로그램을 종료합니다.")
     #     sys.exit()
 
+
     return tmpTargetDict
 
 
 def drawGraph(pDict):
-    days = -1
+    matplotlib.rcParams['font.family']='Malgun Gothic'
+    matplotlib.rcParams['axes.unicode_minus']=False
     
-    # 가장 긴 회차 검색
-    for length in pDict.values():
-        tmplength = len(length)
-        if tmplength > days:
-            days = tmplength
-    
-    print("제일 긴 회차수=", days) # 확인 후 지워도 됨
-    
-    #그래프의 x값 list 생성
-    xAxis = list(range(1, days + 1))  # 100개면 -99~0개까지 x축을 만든다.
-
     # 구해온 자료들을 여기서 세팅과 출력
     i = 0
     for dramaname, dramalist in pDict.items():
         #전역변수로 선언한 colors[] list
-        p.plot(xAxis, dramalist, colors[i], label=dramaname)
+        p.plot(dramalist, colors[i], label=dramaname)
         i += 1
 
         #그래프의 레이블 및 비주얼 효과 생성
-    p.xlabel('turn')
-    p.ylabel('ratings')
+    p.title('시청률 그래프')    
+    p.xlabel('회차')
+    p.ylabel('시청률 %')
     
     p.grid(True)
-    p.legend(loc='upper left')
+    p.legend(['슈퍼맨이 돌아왔다', '미스터 션샤인'],loc='upper left')
     p.show()
 
     return
